@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "id": "daniel.pointer-settings",
+  "name": "Mouse & Touchpad",
+  "version": "0.3.0",
+  "author": "Daniel Večeřa",
+  "license": "MIT",
+  "description": "Separate mouse and touchpad pointer and scroll speeds, with automatic apply, backups and undo.",
+  "kinds": ["bar-widget"],
+  "entryPoints": {"barWidget": "Widget.qml"},
+  "barWidget": {
+    "displayName": "Mouse & Touchpad",
+    "category": "System",
+    "allowMultiple": false,
+    "defaultSection": "right"
+  }
+}

@@ -1,0 +1,16 @@
+[project]
+name = "pointer-settings"
+version = "0.3.0"
+description = "An Omarchy shell plugin for mouse and touchpad sensitivity"
+requires-python = ">=3.13"
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pyright]
+pythonVersion = "3.13"
+typeCheckingMode = "strict"
+include = ["backend.py", "settings.py"]
