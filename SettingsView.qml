@@ -111,14 +111,6 @@ Column {
       maximum: 1
       onEdited: value => root.edit("mouse", value)
     }
-    SliderRow {
-      width: parent.width
-      label: "Wheel scroll speed"
-      value: root.draft.mouse_scroll
-      minimum: 0.1
-      multiplier: true
-      onEdited: value => root.edit("mouse_scroll", value)
-    }
     Row {
       width: parent.width
       spacing: Style.spacing.md
@@ -139,6 +131,14 @@ Column {
         accent: Color.accent
         onToggled: root.edit("mouse_adaptive", !root.draft.mouse_adaptive)
       }
+    }
+    SliderRow {
+      width: parent.width
+      label: "Wheel scroll speed"
+      value: root.draft.mouse_scroll
+      minimum: 0.1
+      multiplier: true
+      onEdited: value => root.edit("mouse_scroll", value)
     }
   }
 
