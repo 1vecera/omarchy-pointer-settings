@@ -205,7 +205,9 @@ class Document:
                 "touchpad": motion_field,
                 "touchpad_scroll": pad_controls.get("scroll_factor"),
                 "touchpad_adaptive": touchpad.get("accel_profile"),
-                "mouse_adaptive": mouse_device.get("accel_profile") or controls.get("accel_profile"),
+                "mouse_adaptive": (
+                    mouse_device.get("accel_profile") if self.mouse_name else controls.get("accel_profile")
+                ),
             }
             resolved = {
                 key: field.number() if field is not None else getattr(inherited.values, key)

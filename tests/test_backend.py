@@ -149,6 +149,18 @@ class DocumentTests(unittest.TestCase):
         self.assertIn('name = "example-mouse", accel_profile = "adaptive"', adaptive)
         self.assertTrue(Document(adaptive).values.mouse_adaptive)
 
+    def test_mouse_device_without_profile_gets_device_specific_override(self):
+        source = SOURCE.replace('accel_profile = "flat"', 'accel_profile = "adaptive"')
+        source += '\nhl.device({ name = "example-mouse", sensitivity = 0.15 })\n'
+        document = Document(source)
+        flat = document.render(replace(document.values, mouse_adaptive=False))
+        self.assertIn('accel_profile = "adaptive"', flat.split("-- Pointer Settings overrides.", 1)[0])
+        self.assertIn(
+            'hl.device({ name = "example-mouse", accel_profile = "flat" })',
+            flat,
+        )
+        self.assertFalse(Document(flat).values.mouse_adaptive)
+
     def test_noop_preserves_precision_and_all_bytes(self):
         document = Document(SOURCE)
         self.assertEqual(document.render(document.values), SOURCE)
