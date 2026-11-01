@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "daniel.pointer-settings",
   "name": "Mouse & Touchpad",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "author": "Daniel Večeřa",
   "license": "MIT",
   "description": "Separate mouse and touchpad pointer and scroll speeds, with automatic apply, backups and undo.",

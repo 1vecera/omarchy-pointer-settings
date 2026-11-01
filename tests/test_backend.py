@@ -10,7 +10,7 @@ from pathlib import Path
 from backend import Controller, Defaults, Document, NeedsDefaults, SettingsError, Values
 
 SOURCE = (Path(__file__).parent / "fixtures/input.lua").read_text()
-DEFAULTS = Defaults(Values(0, 1, 0, 0.4), "adaptive", "example-touchpad")
+DEFAULTS = Defaults(Values(0, 1, 0, 0.4, True, True), "adaptive", "example-touchpad")
 STOCK = "-- User overrides\n-- hl.config({ input = { sensitivity = 0.8 } })\n"
 
 
@@ -43,7 +43,7 @@ class DocumentTests(unittest.TestCase):
         self.assertTrue(rendered.startswith(STOCK))
         self.assertIn('hl.device({ name = "example-touchpad", sensitivity = 0 })', rendered)
         reloaded = Document(rendered, replace(DEFAULTS, values=Values(-0.25, 1, -0.25, 0.4)))
-        self.assertEqual(reloaded.values, Values(-0.25, 1, 0, 0.4))
+        self.assertEqual(reloaded.values, Values(-0.25, 1, 0, 0.4, True, True))
         again = reloaded.render(replace(reloaded.values, mouse=-0.4))
         self.assertEqual(again.count("-- Pointer Settings overrides."), 1)
         self.assertEqual(again.count("hl.device("), 1)
@@ -58,12 +58,12 @@ class DocumentTests(unittest.TestCase):
         source += "hl.config({ input = { sensitivity = 0.2 } })\n"
         source += 'hl.device({ name = "example-touchpad", sensitivity = -0.1 })\n'
         document = Document(source, DEFAULTS)
-        self.assertEqual(document.values, Values(0.2, 1, -0.1, 0.4))
+        self.assertEqual(document.values, Values(0.2, 1, -0.1, 0.4, True, True))
         actual = document.render(replace(document.values, mouse=0.3, touchpad_scroll=0.7))
         self.assertIn("sensitivity = 0.1", actual)
         self.assertIn("natural_scroll = true", actual)
         self.assertNotIn("sensitivity = 0.2", actual)
-        self.assertEqual(Document(actual, DEFAULTS).values, Values(0.3, 1, -0.1, 0.7))
+        self.assertEqual(Document(actual, DEFAULTS).values, Values(0.3, 1, -0.1, 0.7, True, True))
 
     def test_multiple_overrides_for_same_touchpad_use_last_value(self):
         source = SOURCE + '\nhl.device({ name = "example-touchpad", accel_profile = "adaptive" })\n'
@@ -120,6 +120,35 @@ class DocumentTests(unittest.TestCase):
         self.assertEqual(Document(actual).values.mouse, 0.2)
         self.assertEqual(Document(actual).values.touchpad, -0.3)
 
+    def test_adaptive_touchpad_can_switch_to_flat_and_back(self):
+        adaptive_source = SOURCE.replace(
+            'accel_profile = "custom 1 0 0.3771283355"',
+            'accel_profile = "adaptive"',
+        )
+        document = Document(adaptive_source)
+        flat = document.render(replace(document.values, touchpad_adaptive=False))
+        self.assertIn('accel_profile = "adaptive"', adaptive_source)
+        self.assertIn('accel_profile = "flat"', flat)
+        self.assertFalse(Document(flat).values.touchpad_adaptive)
+        adaptive = Document(flat).render(replace(Document(flat).values, touchpad_adaptive=True))
+        self.assertIn('accel_profile = "adaptive"', adaptive)
+        self.assertTrue(Document(adaptive).values.touchpad_adaptive)
+
+    def test_mouse_acceleration_can_switch_to_adaptive_and_back(self):
+        source = SOURCE.replace('accel_profile = "flat"', 'accel_profile = "adaptive"')
+        document = Document(source)
+        flat = document.render(replace(document.values, mouse_adaptive=False))
+        self.assertFalse(Document(flat).values.mouse_adaptive)
+        adaptive = Document(flat).render(replace(Document(flat).values, mouse_adaptive=True))
+        self.assertTrue(Document(adaptive).values.mouse_adaptive)
+
+    def test_explicit_mouse_device_acceleration_can_switch(self):
+        source = SOURCE + '\nhl.device({ name = "example-mouse", accel_profile = "flat" })\n'
+        document = Document(source)
+        adaptive = document.render(replace(document.values, mouse_adaptive=True))
+        self.assertIn('name = "example-mouse", accel_profile = "adaptive"', adaptive)
+        self.assertTrue(Document(adaptive).values.mouse_adaptive)
+
     def test_noop_preserves_precision_and_all_bytes(self):
         document = Document(SOURCE)
         self.assertEqual(document.render(document.values), SOURCE)
@@ -166,7 +195,7 @@ class SaveTests(unittest.TestCase):
         self.assertFalse((self.directory / "state").exists())
         self.assertEqual(document.values, DEFAULTS.values)
         applied = self.controller.apply(document, replace(document.values, mouse=-0.2))
-        self.assertEqual(applied.values, Values(-0.2, 1, 0, 0.4))
+        self.assertEqual(applied.values, Values(-0.2, 1, 0, 0.4, True, True))
         self.assertEqual(self.controller.undo().source, STOCK)
         self.assertEqual(self.config.read_text(), STOCK)
 

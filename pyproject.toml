@@ -1,6 +1,6 @@
 [project]
 name = "pointer-settings"
-version = "0.3.0"
+version = "0.4.0"
 description = "An Omarchy shell plugin for mouse and touchpad sensitivity"
 requires-python = ">=3.13"
 

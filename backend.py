@@ -30,6 +30,8 @@ class Values:
     mouse_scroll: float
     touchpad: float
     touchpad_scroll: float
+    touchpad_adaptive: bool = False
+    mouse_adaptive: bool = False
 
 
 @dataclass(frozen=True)
@@ -148,22 +150,35 @@ class Document:
             devices: dict[str, dict[str, Field]] = {}
             for table in call_tables(source, "device"):
                 name = table["name"].string()
-                if re.search(r"touchpad|trackpad", name, re.IGNORECASE):
-                    devices.setdefault(name, {}).update(table)
-            if len(devices) > 1:
+                devices.setdefault(name, {}).update(table)
+            touchpad_devices = {
+                name: fields for name, fields in devices.items() if re.search(r"touchpad|trackpad", name, re.IGNORECASE)
+            }
+            mouse_devices = {
+                name: fields
+                for name, fields in devices.items()
+                if name not in touchpad_devices and re.search(r"mouse|pointer", name, re.IGNORECASE)
+            }
+            if len(touchpad_devices) > 1:
                 raise SettingsError("Multiple configured touchpads are not supported yet.")
-            touchpad: dict[str, Field] = next(iter(devices.values())) if devices else {}
+            if len(mouse_devices) > 1:
+                raise SettingsError("Multiple configured mice are not supported yet.")
+            touchpad: dict[str, Field] = next(iter(touchpad_devices.values())) if touchpad_devices else {}
+            mouse_device: dict[str, Field] = next(iter(mouse_devices.values())) if mouse_devices else {}
             if defaults is None and (
                 not {"sensitivity", "scroll_factor", "accel_profile"} <= controls.keys()
                 or "scroll_factor" not in pad_controls
                 or not {"sensitivity", "accel_profile"} <= touchpad.keys()
             ):
                 raise NeedsDefaults("Read inherited input settings from Hyprland.")
-            inherited = defaults or Defaults(Values(0, 1, 0, 0.4), "", None)
-            self.touchpad_name = next(iter(devices), inherited.touchpad_name)
-            self.mouse_profile = (
+            inherited = defaults or Defaults(Values(0, 1, 0, 0.4, False), "", None)
+            self.touchpad_name = next(iter(touchpad_devices), inherited.touchpad_name)
+            self.mouse_name = next(iter(mouse_devices), None)
+            global_mouse_profile = (
                 controls["accel_profile"].string() if "accel_profile" in controls else inherited.profile
             )
+            mouse_profile_field = mouse_device.get("accel_profile")
+            self.mouse_profile = mouse_profile_field.string() if mouse_profile_field else global_mouse_profile
             self.profile = touchpad["accel_profile"].string() if "accel_profile" in touchpad else self.mouse_profile
             if self.mouse_profile not in ("flat", "adaptive", ""):
                 raise SettingsError("The mouse has a custom profile; the normal mouse slider would have no effect.")
@@ -189,17 +204,21 @@ class Document:
                 "mouse_scroll": controls.get("scroll_factor"),
                 "touchpad": motion_field,
                 "touchpad_scroll": pad_controls.get("scroll_factor"),
+                "touchpad_adaptive": touchpad.get("accel_profile"),
+                "mouse_adaptive": mouse_device.get("accel_profile") or controls.get("accel_profile"),
             }
             resolved = {
                 key: field.number() if field is not None else getattr(inherited.values, key)
                 for key, field in self.fields.items()
-                if key != "touchpad"
+                if key not in ("touchpad", "touchpad_adaptive", "mouse_adaptive")
             }
             self.values = Values(
                 mouse=resolved["mouse"],
                 mouse_scroll=resolved["mouse_scroll"],
                 touchpad=touchpad_speed,
                 touchpad_scroll=resolved["touchpad_scroll"],
+                touchpad_adaptive=self.profile == "adaptive",
+                mouse_adaptive=self.mouse_profile == "adaptive",
             )
         except (KeyError, ValueError, IndexError) as error:
             raise SettingsError(f"Cannot read the expected literal settings in input.lua: {error}") from error
@@ -213,7 +232,7 @@ class Document:
             "touchpad_scroll": (0.1, 2.0),
         }
         edits: list[tuple[int, int, str]] = []
-        missing: dict[str, float] = {}
+        missing: dict[str, float | str] = {}
         for key, (minimum, maximum) in limits.items():
             value: float = getattr(values, key)
             if value == getattr(self.values, key):
@@ -232,6 +251,38 @@ class Document:
                 missing[key] = value
             else:
                 edits.append((field.tokens[0].start, field.tokens[-1].end, replacement))
+        adaptive = values.touchpad_adaptive
+        if adaptive != self.values.touchpad_adaptive:
+            if self.custom:
+                raise SettingsError("Adaptive acceleration cannot be toggled for a custom touchpad profile.")
+            if self.touchpad_name is None:
+                raise SettingsError("No touchpad was detected or configured.")
+            profile_field = self.fields["touchpad_adaptive"]
+            if profile_field is None:
+                missing["touchpad_adaptive"] = "adaptive" if adaptive else "flat"
+            else:
+                edits.append(
+                    (
+                        profile_field.tokens[0].start,
+                        profile_field.tokens[-1].end,
+                        f'"{"adaptive" if adaptive else "flat"}"',
+                    )
+                )
+        mouse_adaptive = values.mouse_adaptive
+        if mouse_adaptive != self.values.mouse_adaptive:
+            if self.mouse_profile not in ("flat", "adaptive", ""):
+                raise SettingsError("Adaptive acceleration cannot be toggled for a custom mouse profile.")
+            profile_field = self.fields["mouse_adaptive"]
+            if profile_field is None:
+                missing["mouse_adaptive"] = "adaptive" if mouse_adaptive else "flat"
+            else:
+                edits.append(
+                    (
+                        profile_field.tokens[0].start,
+                        profile_field.tokens[-1].end,
+                        f'"{"adaptive" if mouse_adaptive else "flat"}"',
+                    )
+                )
         result = self.source
         for start, end, replacement in sorted(edits, reverse=True):
             result = result[:start] + replacement + result[end:]
@@ -247,13 +298,24 @@ class Document:
                 input_lines.append(f"    {option} = {missing[key]:.10g},")
         if "touchpad_scroll" in missing:
             input_lines.append(f"    touchpad = {{ scroll_factor = {missing['touchpad_scroll']:.10g} }},")
+        if "mouse_adaptive" in missing and not self.mouse_name:
+            input_lines.append(f'    accel_profile = "{missing["mouse_adaptive"]}",')
         if input_lines:
             additions.append("hl.config({\n  input = {\n" + "\n".join(input_lines) + "\n  },\n})")
         if "touchpad" in missing:
             name = self.touchpad_name
             if name is None or not re.fullmatch(r"[\w .:/-]+", name):
                 raise SettingsError("This touchpad name cannot be safely added to the Lua configuration.")
-            additions.append(f'hl.device({{ name = "{name}", sensitivity = {missing["touchpad"]:.10g} }})')
+            device_fields = [f'name = "{name}"']
+            if "touchpad" in missing:
+                device_fields.append(f"sensitivity = {missing['touchpad']:.10g}")
+            if "touchpad_adaptive" in missing:
+                device_fields.append(f'accel_profile = "{missing["touchpad_adaptive"]}"')
+            additions.append("hl.device({ " + ", ".join(device_fields) + " })")
+        if "mouse_adaptive" in missing:
+            profile = missing["mouse_adaptive"]
+            if self.mouse_name:
+                additions.append(f'hl.device({{ name = "{self.mouse_name}", accel_profile = "{profile}" }})')
         if additions:
             result = result.rstrip() + "\n\n-- Pointer Settings overrides.\n" + "\n".join(additions) + "\n"
         return result
@@ -313,13 +375,19 @@ class Controller:
             wheel = float(json.loads(self.run(["-j", "getoption", "input:scroll_factor"]))["float"])
             scroll = float(json.loads(self.run(["-j", "getoption", "input:touchpad:scroll_factor"]))["float"])
             profile = str(json.loads(self.run(["-j", "getoption", "input:accel_profile"]))["str"])
+            if profile == "[[EMPTY]]":
+                profile = ""
             pointers = json.loads(self.run(["-j", "devices"]))["mice"]
             names: list[str] = [item["name"] for item in pointers if re.search("touchpad|trackpad", item["name"], re.I)]
             if len(names) > 1:
                 raise SettingsError("Multiple connected touchpads are not supported yet.")
             if not all(math.isfinite(value) for value in (mouse, wheel, scroll)):
                 raise SettingsError("Hyprland returned an invalid speed setting.")
-            return Defaults(Values(mouse, wheel, mouse, scroll), profile, names[0] if names else None)
+            return Defaults(
+                Values(mouse, wheel, mouse, scroll, profile == "adaptive", profile == "adaptive"),
+                profile,
+                names[0] if names else None,
+            )
         except (ValueError, KeyError, TypeError) as error:
             raise SettingsError("Cannot read the active Hyprland input defaults.") from error
 

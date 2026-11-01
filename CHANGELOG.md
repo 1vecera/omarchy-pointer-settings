@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.0 — 2026-10-31
+
+- Add independent adaptive-acceleration toggles for mouse and touchpad.
+- Preserve explicit per-device acceleration profiles when applying changes.
+- Keep compatibility with Hyprland's unset global acceleration profile.
+
 ## 0.3.0 — 2026-09-24
 
 First public release.

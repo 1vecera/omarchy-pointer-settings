@@ -6,7 +6,7 @@ import qs.Ui
 Column {
   id: root
   property var snapshot: null
-  property var draft: ({mouse: 0, mouse_scroll: 1, touchpad: 1, touchpad_scroll: 1})
+  property var draft: ({mouse: 0, mouse_scroll: 1, touchpad: 1, touchpad_scroll: 1, touchpad_adaptive: false, mouse_adaptive: false})
   property string status: "Loading settings…"
   property bool failed: false
   property string action: "status"
@@ -119,6 +119,27 @@ Column {
       multiplier: true
       onEdited: value => root.edit("mouse_scroll", value)
     }
+    Row {
+      width: parent.width
+      spacing: Style.spacing.md
+      Text {
+        width: parent.width - mouseAdaptiveSwitch.width - parent.spacing
+        text: "Adaptive acceleration"
+        textFormat: Text.PlainText
+        color: Color.foreground
+        font.family: Style.font.family
+        font.pixelSize: Style.font.body
+        verticalAlignment: Text.AlignVCenter
+      }
+      ToggleSwitch {
+        id: mouseAdaptiveSwitch
+        checked: root.draft.mouse_adaptive
+        busy: root.busy
+        foreground: Color.foreground
+        accent: Color.accent
+        onToggled: root.edit("mouse_adaptive", !root.draft.mouse_adaptive)
+      }
+    }
   }
 
   PanelSeparator { width: parent.width }
@@ -138,6 +159,28 @@ Column {
       maximum: root.snapshot && root.snapshot.custom ? 2 : 1
       multiplier: root.snapshot !== null && root.snapshot.custom
       onEdited: value => root.edit("touchpad", value)
+    }
+    Row {
+      width: parent.width
+      spacing: Style.spacing.md
+      visible: root.snapshot === null || !root.snapshot.custom
+      Text {
+        width: parent.width - adaptiveSwitch.width - parent.spacing
+        text: "Adaptive acceleration"
+        textFormat: Text.PlainText
+        color: Color.foreground
+        font.family: Style.font.family
+        font.pixelSize: Style.font.body
+        verticalAlignment: Text.AlignVCenter
+      }
+      ToggleSwitch {
+        id: adaptiveSwitch
+        checked: root.draft.touchpad_adaptive
+        busy: root.busy
+        foreground: Color.foreground
+        accent: Color.accent
+        onToggled: root.edit("touchpad_adaptive", !root.draft.touchpad_adaptive)
+      }
     }
     SliderRow {
       width: parent.width

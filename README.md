@@ -6,7 +6,7 @@ Fine-tune your pointer without editing Lua. A small Omarchy bar plugin with sepa
 
 <p align="center"><img src="preview.png" alt="Mouse and touchpad settings panel with four speed sliders and Reload and Undo buttons" width="460"></p>
 
-- **Separate controls:** mouse sensitivity, wheel scrolling, touchpad motion, and two-finger scrolling.
+- **Separate controls:** mouse sensitivity, wheel scrolling, mouse and touchpad adaptive acceleration, touchpad motion, and two-finger scrolling.
 - **Automatic apply:** move a slider; your changes save after a 300 ms pause. No Apply button.
 - **Native appearance:** uses Omarchy's theme, sliders, buttons, and keyboard-aware popup.
 - **Recoverable edits:** private backups, guarded undo, and rollback if Hyprland rejects a change.
@@ -39,8 +39,10 @@ To open it from a launcher or keybinding, use `omarchy-shell daniel.pointer-sett
 | Control | Range | Effect |
 | --- | --- | --- |
 | Mouse pointer sensitivity | −1 to 1 | Global Hyprland sensitivity; also affects a TrackPoint or other pointer that inherits it. |
+| Mouse adaptive acceleration | On/off | Selects libinput's adaptive or flat profile for the mouse. |
 | Mouse wheel scroll speed | 0.1× to 2× | Global scroll multiplier. |
 | Touchpad pointer speed | −1 to 1, or 0.05× to 2× | Device sensitivity for flat/adaptive acceleration, or motion gain for a supported custom profile. |
+| Adaptive acceleration | On/off | Selects libinput's adaptive or flat profile for the touchpad. |
 | Two-finger scroll speed | 0.1× to 2× | Separate touchpad scroll multiplier. |
 
 For a linear custom touchpad profile, the plugin changes the motion curve itself. libinput's ordinary sensitivity control does not affect a custom profile. Separate custom scrolling points are preserved. See the [libinput documentation](https://wayland.freedesktop.org/libinput/doc/latest/pointer-acceleration.html#the-custom-acceleration-profile).
